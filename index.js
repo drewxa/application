@@ -6,14 +6,12 @@ module.exports = app => {
   app.log('Yay, the app was loaded!')
 
   // Add Branch Protection
-  app.on('installation_repositories.added', (context) => {
+  app.on('repository_import.success', (context) => {
     app.log('added protected branch to repo')
     for (repo of context.payload.repositories_added) {
       app.log(repo)
       let full_name = repo.full_name
-      context.github.repos.updateBranchProtection({
-        owner: full_name.split('/')[0],
-        repo: repo.name,
+      context.github.repos.updateBranchProtection(context.repo({
         branch: 'master',
         required_status_checks: null,
         enforce_admins: true,
@@ -21,7 +19,7 @@ module.exports = app => {
           require_code_owner_reviews: true,
         },
         restrictions: null
-      })
+      }))
     }
   })
 }
