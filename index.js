@@ -1,3 +1,25 @@
+async function foundInstallationId (app, login) {
+  app.log(login)
+  const github = await app.auth()
+  const installations = await github.apps.getInstallations()
+  for (const installation of installations.data) {
+    app.log(installation.account)
+    if (installation.account.login === login) {
+      app.log('found ' + installation.id)
+      return installation.id
+    }
+  }
+  return -1
+}
+
+function formatMessage (report) {
+  return '```\n' + report + '\n```'
+}
+
+function checkName () {
+  return 'Coverage'
+}
+
 /**
  * This is the entry point for your Probot App.
  * @param {import('probot').Application} app - Probot's Application class.
@@ -36,42 +58,38 @@ module.exports = app => {
     app.log.info('on coverage report')
     app.log(req.body)
     const report = Buffer.from(req.body.report, 'base64').toString()
-    const {pull_request, head_branch, head_sha, need_comment} = req.body
-    const {login, repo} = req.body.slug.split('/')
-  
+    const {head_branch, head_sha, slug} = req.body
+    const login = slug.split('/')[0]
+    const repo = slug.split('/')[1]
+
     const id = await foundInstallationId(app, login)
     if (id === -1) {
       res.sendStatus(404)
       return
     }
-  
+
     const github = await app.auth(id)
-  
-    if (need_comment) {
-      const comment = {
-        number: pull_request,
-        repo: repo,
+    if (github) {
+      const params = {
         owner: login,
-        body: formatMessage(report)
+        repo: repo,
+        name: checkName(),
+        head_branch: head_branch,
+        head_sha: head_sha,
+        status: 'completed',
+        conclusion: 'success',
+        completed_at: new Date(),
+        output: {
+          title: 'Coverage report',
+          summary: formatMessage(report)
+        }
       }
-      app.log(comment)
-      github.issues.createComment(comment)
+      app.log(params)
+      github.checks.create(params)
+      res.send('ok')
+      return
     }
-  
-    context.github.checks.create({
-      owner: login,
-      repo: repo,
-      name: checkName(),
-      head_branch: head_branch,
-      head_sha: head_sha,
-      status: 'completed',
-      conclusion: 'success',
-      completed_at: new Date(),
-      output: {
-        title: 'Coverage report',
-        summary: formatMessage(report)
-      }
-    })
-    res.send('ok')
+
+    res.send(504)
   })
 }
