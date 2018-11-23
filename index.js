@@ -20,6 +20,44 @@ function checkName () {
   return 'Coverage'
 }
 
+async function createCheckRoutine (app, req, res, checkName, checkTitle) {
+  app.log(req.body)
+  const report = Buffer.from(req.body.report, 'base64').toString()
+  const {head_branch, head_sha, slug} = req.body
+  const login = slug.split('/')[0]
+  const repo = slug.split('/')[1]
+
+  const id = await foundInstallationId(app, login)
+  if (id === -1) {
+    res.sendStatus(404)
+    return
+  }
+
+  const github = await app.auth(id)
+  if (github) {
+    const params = {
+      owner: login,
+      repo: repo,
+      name: checkName,
+      head_branch: head_branch,
+      head_sha: head_sha,
+      status: 'completed',
+      conclusion: 'success',
+      completed_at: new Date(),
+      output: {
+        title: checkTitle,
+        summary: formatMessage(report)
+      }
+    }
+    app.log(params)
+    github.checks.create(params)
+    res.send('ok')
+    return
+  }
+
+  res.send(504)
+}
+
 /**
  * This is the entry point for your Probot App.
  * @param {import('probot').Application} app - Probot's Application class.
@@ -56,40 +94,11 @@ module.exports = app => {
 
   route.post('/coverage', async (req, res) => {
     app.log.info('on coverage report')
-    app.log(req.body)
-    const report = Buffer.from(req.body.report, 'base64').toString()
-    const {head_branch, head_sha, slug} = req.body
-    const login = slug.split('/')[0]
-    const repo = slug.split('/')[1]
+    await createCheckRoutine(app, req, res, checkName(), 'Coverage report')
+  })
 
-    const id = await foundInstallationId(app, login)
-    if (id === -1) {
-      res.sendStatus(404)
-      return
-    }
-
-    const github = await app.auth(id)
-    if (github) {
-      const params = {
-        owner: login,
-        repo: repo,
-        name: checkName(),
-        head_branch: head_branch,
-        head_sha: head_sha,
-        status: 'completed',
-        conclusion: 'success',
-        completed_at: new Date(),
-        output: {
-          title: 'Coverage report',
-          summary: formatMessage(report)
-        }
-      }
-      app.log(params)
-      github.checks.create(params)
-      res.send('ok')
-      return
-    }
-
-    res.send(504)
+  route.post('/duplication', async (req, res) => {
+    app.log.info('on duplication report')
+    await createCheckRoutine(app, req, res, 'Code quality', 'Code quality')
   })
 }
