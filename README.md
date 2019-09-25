@@ -1,5 +1,7 @@
 # coverage-check-app
 
+Github бот, который спамит в студенческие PR комментарии о покрытии кода и найденом дублировании.
+
 > A GitHub App built with [Probot](https://probot.github.io) that A Probot app
 
 ## Setup
